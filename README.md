@@ -1,2 +1,2 @@
 # cmpt361_finalproject
-cmpt 361- final project
+Secure Mail Transfer Socket Program
