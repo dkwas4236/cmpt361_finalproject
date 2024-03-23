@@ -2,6 +2,7 @@
 import socket, sys, os, glob, datetime, json
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad,unpad
+from Crypto.PublicKey import RSA
 
 def client():
     serverPort = 13000
@@ -78,11 +79,6 @@ def client():
                 print("Connection Terminated")
                 clientSocket.close()
                 sys.exit(1)
-    
-        
-        '''else:
-            message = clientSocket.recv(2048)
-            print(message.decode('ascii'))'''
          
 
     except socket.error as e:
