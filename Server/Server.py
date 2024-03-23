@@ -5,8 +5,6 @@ from Crypto.Util.Padding import pad,unpad
 
 def server():
     serverPort = 13000
-    welcome = 0
-
     while True:
         try:
             serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -22,13 +20,35 @@ def server():
                 child_pid = os.fork()
                 if child_pid == 0:  
                     # Send Username message to server
-                    welcomeMessage = ("Enter your username: ")
-                    connectionSocket.send(welcomeMessage.encode('ascii'))
-
+                    usernameMessage = ("Enter your username: ")
+                    connectionSocket.send(usernameMessage.encode('ascii'))
                     # Receive Username
                     username = connectionSocket.recv(2048).decode('ascii')
+                    # Send Password message to server 
+                    passwordMessage = ("Enter your password: ")
+                    connectionSocket.send(passwordMessage.encode('ascii'))
+                    # Receive password
+                    password = connectionSocket.recv(2048).decode('ascii')
 
-                    if username == "user1": # TODO accept only certain users
+                    # get directory of user_pass.json
+                    dir = os.path.dirname(os.path.abspath(__file__))
+                    user_pass = os.path.join(dir,"user_pass.json")
+                    # Open user_pass file and read dictonary
+                    with open(user_pass, 'r') as users:
+                        data = json.load(users)
+                  
+                    # check if username & password is valid
+                    authorization = 0 
+                    for db_username in data.keys():
+                        if db_username == username:
+                            db_password = data[db_username]
+                            if password == db_password:
+                                authorization = 1
+                                break
+                            else:
+                                break
+
+                    if authorization == 1: # TODO accept only certain users
                         # Create menu prompts and sent to the client
                         menuMessage = ("\nSelect the operation:\n\t1) Create and send an email\n\t2) Display the inbox list\n\t3) Display the email contents\n\t4)Terminate the connection\nChoice: ")
                         connectionSocket.send(menuMessage.encode('ascii'))
@@ -89,7 +109,8 @@ def server():
                                 print("Invalid choice.")
 
                     else:
-                        terminationMessage = "Incorrect username. Connection Terminated"
+                        terminationMessage = "Invalid username or password.\nTerminating."
+            
                         connectionSocket.send(terminationMessage.encode('ascii'))
                         connectionSocket.close()
                         

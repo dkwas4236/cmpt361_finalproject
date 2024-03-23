@@ -25,10 +25,19 @@ def client():
         username = input(usernameReq)
         # Send username back to server 
         clientSocket.send(username.encode('ascii'))
+        # Receive password message 
+        passwordReq = clientSocket.recv(2048).decode('ascii') 
+        password = input(passwordReq)
+        # send password back to server
+        clientSocket.send(password.encode('ascii'))
 
         # Recive menu from server
         menu = clientSocket.recv(2048).decode('ascii')
-        
+        if not menu.endswith(": "):
+            print(menu)
+            clientSocket.close()
+            sys.exit(1)
+         
         # Loop until user termination
         while(1):
             # Display menu and get user chice 
@@ -76,7 +85,7 @@ def client():
                 
             elif choice == "4":
                 # Client terminates connection with the server 
-                print("Connection Terminated")
+                print("The connection is terminated with the server.")
                 clientSocket.close()
                 sys.exit(1)
          
