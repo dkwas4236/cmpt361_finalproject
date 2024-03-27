@@ -69,57 +69,56 @@ def server():
                                 break
 
                     # receive the "OK"
-                    connectionSocket.recv(2048)
+                    decrypt(connectionSocket, sym_key)
                     if authorization == 1: # TODO accept only certain users
                         # Create menu prompts and sent to the client
                         menuMessage = ("\nSelect the operation:\n\t1) Create and send an email\n\t2) Display the inbox list\n\t3) Display the email contents\n\t4) Terminate the connection\nChoice: ")
-                        connectionSocket.send(menuMessage.encode('ascii'))
+                        encrypt(menuMessage, connectionSocket, sym_key)
 
                         while (1):
                             # Receive user chice from client 
-                            clientChoice = connectionSocket.recv(2048)
-                            decodedChoice = clientChoice.decode('ascii')
+                            decodedChoice = decrypt(connectionSocket, sym_key)
 
                             if decodedChoice == "1":
                                 # Send destination prompt to the client 
                                 destination = "Enter destinations (seperated by;): "
-                                connectionSocket.send(destination.encode('ascii'))
+                                encrypt(destination, connectionSocket, sym_key)
                                 # Receive the destinations from the client 
-                                destination = connectionSocket.recv(2048).decode('ascii')
+                                destination = decrypt(connectionSocket, sym_key)
                                 print(destination)
                     
                                 # Send title prompt to the user 
                                 title = "Enter title: "
-                                connectionSocket.send(title.encode('ascii'))
+                                encrypt(title, connectionSocket, sym_key)
                                 # receive title from the client
-                                title = connectionSocket.recv(2048).decode('ascii')
+                                title = decrypt(connectionSocket, sym_key)
                                 print(title)
 
                                 # Send loadFile prompt to the user
                                 loadFile= "Would you like to load contents from a file?(Y/N)"
-                                connectionSocket.send(loadFile.encode('ascii'))
+                                encrypt(loadFile, connectionSocket, sym_key)
                                 # Receive response from user
-                                loadFile = connectionSocket.recv(2048).decode('ascii')
+                                loadFile = decrypt(connectionSocket, sym_key)
                                 print(loadFile)
 
                                 # Send content prompt to the user
                                 contents = "Enter message contents: "
-                                connectionSocket.send(contents.encode('ascii'))
+                                encrypt(contents, connectionSocket, sym_key)
                                 # Receive content from the client 
-                                content = connectionSocket.recv(2048).decode('ascii')
+                                content = decrypt(connectionSocket, sym_key)
                                 print(content)
 
                             elif decodedChoice == "2":
                                 # Get inbox list and send to server
                                 inboxlist = "Inbox List Info Displayed"
-                                connectionSocket.send(inboxlist.encode('ascii'))
+                                encrypt(inboxlist, connectionSocket, sym_key)
 
                             elif decodedChoice == "3":
                                 # Send prompt to server
                                 response = "Enter the email index you wish to view: "
-                                connectionSocket.send(response.encode('ascii'))
+                                encrypt(response, connectionSocket, sym_key)
                                 # Receive index from user
-                                index = connectionSocket.recv(2048).decode('ascii')
+                                index = decrypt(connectionSocket, sym_key)
                                 print(index)
 
                             elif decodedChoice == "4":
@@ -147,30 +146,35 @@ def server():
                 serverSocket.close()
                 sys.exit(1)
 
-# RSA decrypt method for initial handshake between client and server
+# RSA decrypt method for INITIAL handshake between client and server
 def rsa_decrypt(encrypted_message, private_key):
     cipher = PKCS1_OAEP.new(private_key)
     decrypted_message = cipher.decrypt(encrypted_message)
     return decrypted_message
 
-# RSA encrypt method for initial handshake between client and server
+# RSA encrypt method for INITIAL handshake between client and server
 def rsa_encrypt(message, public_key):
     cipher = PKCS1_OAEP.new(public_key)
     encrypted_message = cipher.encrypt(message)
     return encrypted_message
 
-# encrypts messages sent by server using AES (symmetric keys)
-def encrypt(message, key, socket):
+# encrypts messages sent by server using AES (symmetric keys) (all other encrypts after handshake)
+def encrypt(message, socket, key):
     cipher = AES.new(key, AES.MODE_ECB)
     cipher_bytes = cipher.encrypt(pad(message.encode(), AES.block_size))
     socket.send(cipher_bytes)
-# decrypts messages sent by client using AES (symmetric keys)
-def decrypt(ciphertext, key):
-    cipher = AES.new(key, AES.MODE_ECB)
-    plaintext = unpad(cipher.decrypt(ciphertext), AES.block_size)
-    return plaintext.decode()
 
-# generates a 256 AES key ( 256 = 32 bytes) that will exchanged with client
+# decrypts messages sent by client using AES (symmetric keys) (all other decrypts after handshake)
+def decrypt(socket, key):
+        # receive data from the socket
+        encrypted_data = socket.recv(2048)
+
+        # decrypt the data
+        cipher = AES.new(key, AES.MODE_ECB)
+        plaintext = unpad(cipher.decrypt(encrypted_data), AES.block_size)
+        return plaintext.decode()
+
+# generates a 256 AES key ( 256 = 32 bytes) that will be exchanged with client
 def generate_key(key_size=32):
     return get_random_bytes(key_size)
 
