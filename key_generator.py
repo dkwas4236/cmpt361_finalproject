@@ -34,11 +34,15 @@ def generate_save_keys(usernames, key_size=1024):
         save_key(client_private, '%s_private.pem' % username, directory='Client')
         save_key(client_public, '%s_public.pem' % username, directory='Client')
         save_key(client_public, '%s_public.pem' % username, directory='Server')
+        # creates directories to store emails
+        dir = os.path.dirname(os.path.abspath(__file__))
+        ensure_directory_exists(os.path.join(dir,'Server/%s' % username))
 
 
 # ensures the directory exists, creates it if it doesn't
 def ensure_directory_exists(directory):
     if not os.path.exists(directory):
+        print(f"creating directory {directory}")
         os.makedirs(directory)
 
 client_usernames = ['client1', 'client2', 'client3', 'client4', 'client5']

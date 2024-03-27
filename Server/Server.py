@@ -9,7 +9,9 @@ def server():
     serverPort = 13000
 
     # retrieve the servers private keys
-    with open('server_private.pem', 'rb') as file:
+    dir = os.path.dirname(os.path.abspath(__file__))
+    server_private_key_file = os.path.join(dir,"server_private.pem")
+    with open(server_private_key_file, 'rb') as file:
         server_private_key = RSA.import_key(file.read())
 
     while True:
@@ -40,7 +42,7 @@ def server():
                     password = rsa_decrypt(encrypted_password, server_private_key).decode()
 
                     # get directory of user_pass.json
-                    dir = os.path.dirname(os.path.abspath(__file__))
+                    # dir = os.path.dirname(os.path.abspath(__file__))
                     user_pass = os.path.join(dir,"user_pass.json")
                     # Open user_pass file and read dictonary
                     with open(user_pass, 'rb') as users:
@@ -55,7 +57,8 @@ def server():
                             if password == db_password:
                                 authorization = 1
                                 # retrieve the clients public keys
-                                with open('%s_public.pem' % username, 'rb') as file:
+                                client_public_key_file = os.path.join(dir,'%s_public.pem' % username)
+                                with open(client_public_key_file, 'rb') as file:
                                     client_public_key = RSA.import_key(file.read())
                                 # create the sym_key, encode it, and send it
                                 sym_key = generate_key()
@@ -65,12 +68,11 @@ def server():
                                 connectionSocket.send(symkey_encrypted)
                                 print("Connection Accepted and Symmetric Key Generated for client: " + username)
                                 break
-                            else:
-                                break
+                            
 
                     # receive the "OK"
-                    decrypt(connectionSocket, sym_key)
-                    if authorization == 1: # TODO accept only certain users
+                    if authorization == 1: 
+                        decrypt(connectionSocket, sym_key)
                         # Create menu prompts and sent to the client
                         menuMessage = ("\nSelect the operation:\n\t1) Create and send an email\n\t2) Display the inbox list\n\t3) Display the email contents\n\t4) Terminate the connection\nChoice: ")
                         encrypt(menuMessage, connectionSocket, sym_key)
@@ -81,32 +83,37 @@ def server():
 
                             if decodedChoice == "1":
                                 # Send destination prompt to the client 
-                                destination = "Enter destinations (seperated by;): "
-                                encrypt(destination, connectionSocket, sym_key)
-                                # Receive the destinations from the client 
-                                destination = decrypt(connectionSocket, sym_key)
-                                print(destination)
-                    
-                                # Send title prompt to the user 
-                                title = "Enter title: "
-                                encrypt(title, connectionSocket, sym_key)
-                                # receive title from the client
-                                title = decrypt(connectionSocket, sym_key)
-                                print(title)
+                                emailPrompt = "Send the email"
+                                encrypt(emailPrompt,connectionSocket,sym_key)
 
-                                # Send loadFile prompt to the user
-                                loadFile= "Would you like to load contents from a file?(Y/N)"
-                                encrypt(loadFile, connectionSocket, sym_key)
-                                # Receive response from user
-                                loadFile = decrypt(connectionSocket, sym_key)
-                                print(loadFile)
+                                # Get email from client 
+                                email = receive_email(connectionSocket,sym_key)
 
-                                # Send content prompt to the user
-                                contents = "Enter message contents: "
-                                encrypt(contents, connectionSocket, sym_key)
-                                # Receive content from the client 
-                                content = decrypt(connectionSocket, sym_key)
-                                print(content)
+                                email_fields = email.splitlines()
+                                ind = 0
+                                for field in email_fields:
+                                    # Get "from" line
+                                    if field.startswith("From:"):
+                                        sending_user = field.split(": ")[-1]
+                                    # Get "sent to" line 
+                                    if field.startswith("To:"):
+                                        user_string = field.split(": ")[-1]
+                                        users = user_string.strip().split(";")
+                                        # create and add date abd time field to email
+                                        now = datetime.datetime.now()
+                                        field_datetime = f"Time and Date: {now}"
+                                    if field.startswith("Title:"):
+                                        title = field.split(": ")[-1].strip()
+                                    # Get "content length" line
+                                    if field.startswith("Content Length:"):
+                                        length = field.split(": ")[-1]
+                                # create email with date and time
+                                email_fields.insert(2,field_datetime)
+                                email = '\n'.join(str(field) for field in email_fields)
+                                print(f"An email from {sending_user} is sent to {user_string} has a content length of {length}\n")
+                                store_emails(users,title,email,sending_user)
+                                    
+                            
 
                             elif decodedChoice == "2":
                                 # Get inbox list and send to server
@@ -132,8 +139,8 @@ def server():
                     else:
                         print("The received client information: " + username + " is invalid (Connection Terminated).")
                         terminationMessage = "Invalid username or password.\nTerminating."
-            
-                        connectionSocket.send(terminationMessage.encode('ascii'))
+                        #terminationMessage += b'FAILED'
+                        connectionSocket.send(terminationMessage.encode('ascii')+b'FAILED')
                         connectionSocket.close()
                         
 
@@ -166,13 +173,36 @@ def encrypt(message, socket, key):
 
 # decrypts messages sent by client using AES (symmetric keys) (all other decrypts after handshake)
 def decrypt(socket, key):
-        # receive data from the socket
-        encrypted_data = socket.recv(2048)
+    # receive data from the socket
+    encrypted_data = socket.recv(2048)
 
-        # decrypt the data
-        cipher = AES.new(key, AES.MODE_ECB)
-        plaintext = unpad(cipher.decrypt(encrypted_data), AES.block_size)
-        return plaintext.decode()
+    # decrypt the data
+    cipher = AES.new(key, AES.MODE_ECB)
+    plaintext = unpad(cipher.decrypt(encrypted_data), AES.block_size)
+    return plaintext.decode()
+
+def receive_email(socket,key):
+    email = b''
+    cipher = AES.new(key, AES.MODE_ECB)
+    # get email chunks and decrypt 
+    while (1):
+        encrypted_chunk = socket.recv(1028)
+        plaintext = unpad(cipher.decrypt(encrypted_chunk), AES.block_size)
+        # End of email
+        if plaintext.endswith(b'END_OF_EMAIL'):
+            email += plaintext[:-len(b'END_OF_EMAIL')]
+            break
+        else:
+            email += plaintext
+    # decode and return 
+    return email.decode()
+
+def store_emails(users,title,email,sender):
+    for user in users:
+        dir = os.path.dirname(os.path.abspath(__file__))
+        filename = f'{user}/{sender}_{title.replace(" ","_")}.txt'
+        with open(os.path.join(dir,filename), 'w') as email_file:
+            email_file.write(email)
 
 # generates a 256 AES key ( 256 = 32 bytes) that will be exchanged with client
 def generate_key(key_size=32):
