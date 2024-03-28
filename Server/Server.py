@@ -49,13 +49,14 @@ def server():
                         data = json.load(users)
                   
                     # check if username & password is valid
-                    authorization = 0
+                    authorization = " "
                     sym_key = None
                     for db_username in data.keys():
                         if db_username == username:
                             db_password = data[db_username]
                             if password == db_password:
-                                authorization = 1
+                                authorization = "AUTHORIZED"
+                                connectionSocket.send(authorization.encode('ascii'))
                                 # retrieve the clients public keys
                                 client_public_key_file = os.path.join(dir,'%s_public.pem' % username)
                                 with open(client_public_key_file, 'rb') as file:
@@ -68,10 +69,9 @@ def server():
                                 connectionSocket.send(symkey_encrypted)
                                 print("Connection Accepted and Symmetric Key Generated for client: " + username)
                                 break
-                            
 
-                    # receive the "OK"
-                    if authorization == 1: 
+                    if authorization == "AUTHORIZED":
+                        # receive the "OK"
                         decrypt(connectionSocket, sym_key)
                         # Create menu prompts and sent to the client
                         menuMessage = ("\nSelect the operation:\n\t1) Create and send an email\n\t2) Display the inbox list\n\t3) Display the email contents\n\t4) Terminate the connection\nChoice: ")
@@ -137,12 +137,11 @@ def server():
                                 print("Invalid choice.")
 
                     else:
+                        connectionSocket.send(authorization.encode('ascii'))
                         print("The received client information: " + username + " is invalid (Connection Terminated).")
                         terminationMessage = "Invalid username or password.\nTerminating."
-                        #terminationMessage += b'FAILED'
-                        connectionSocket.send(terminationMessage.encode('ascii')+b'FAILED')
+                        connectionSocket.send(terminationMessage.encode('ascii'))
                         connectionSocket.close()
-                        
 
             except socket.error as e:
                 print('An error occurred:', e)

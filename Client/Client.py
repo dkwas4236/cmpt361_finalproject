@@ -39,30 +39,29 @@ def client():
         password_encrypted = rsa_encrypt(password, server_public_key)
         clientSocket.send(password_encrypted)
 
-        # grab the users private key by taking their username
-        client_private_key_file = os.path.join(dir,'%s_private.pem' % username)
-        with open(client_private_key_file, 'rb') as file:
-            client_private_key = RSA.import_key(file.read())
-        # receive length of encrypted key
-        encrypted_length = int.from_bytes(clientSocket.recv(4), 'big')
-        # receive the encrypted key based on the length
-        symkey_encrypted = b''
-        while len(symkey_encrypted) < encrypted_length:
-            part = clientSocket.recv(encrypted_length - len(symkey_encrypted))
-            symkey_encrypted += part
-        sym_key = rsa_decrypt(symkey_encrypted, client_private_key)
-        encrypt("OK", clientSocket, sym_key)
-
+        # validate authorization
+        authorization = clientSocket.recv(2048).decode(('ascii'))
+        if authorization == "AUTHORIZED":
+            # grab the users private key by taking their username
+            client_private_key_file = os.path.join(dir, '%s_private.pem' % username)
+            with open(client_private_key_file, 'rb') as file:
+                client_private_key = RSA.import_key(file.read())
+            # receive length of encrypted key
+            encrypted_length = int.from_bytes(clientSocket.recv(4), 'big')
+            # receive the encrypted key based on the length
+            symkey_encrypted = b''
+            while len(symkey_encrypted) < encrypted_length:
+                part = clientSocket.recv(encrypted_length - len(symkey_encrypted))
+                symkey_encrypted += part
+            sym_key = rsa_decrypt(symkey_encrypted, client_private_key)
+            encrypt("OK", clientSocket, sym_key)
+        else:
+            termination = clientSocket.recv(2048).decode('ascii')
+            print(termination)
+            sys.exit(1)
 
         # Receive menu from server
-        menu = clientSocket.recv(2048)
-        if menu.endswith(b'FAILED'):
-            print(menu)
-            clientSocket.close()
-            sys.exit(1)
-        else:
-            cipher = AES.new(sym_key, AES.MODE_ECB)
-            menu = unpad(cipher.decrypt(menu), AES.block_size).decode()
+        menu = decrypt(clientSocket, sym_key)
 
         # Loop until user termination
         while(1):
