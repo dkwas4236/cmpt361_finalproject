@@ -94,17 +94,15 @@ def server():
 
                                 # Get email from client 
                                 email = receive_email(connectionSocket,sym_key)
-                                
-                                email_fields = email.replace("\x10","").splitlines()
-                                ind = 0
 
+                                # Track until all headers are recorded
+                                count = 0
                                 email_fields = email.splitlines()
-
-
                                 for field in email_fields:
                                     # Get "from" line
                                     if field.startswith("From:"):
                                         sending_user = field.split(": ")[-1]
+                                        count+=1
                                     # Get "sent to" line 
                                     if field.startswith("To:"):
                                         user_string = field.split(": ")[-1]
@@ -112,15 +110,22 @@ def server():
                                         # create and add date abd time field to email
                                         now = datetime.datetime.now()
                                         field_datetime = f"Time and Date: {now}"
+                                        count+=1
+                                    # Get title line
                                     if field.startswith("Title:"):
                                         title = field.split(": ")[-1].strip()
+                                        count+=1
                                     # Get "content length" line
                                     if field.startswith("Content Length:"):
                                         length = field.split(": ")[-1]
+                                        count+=1
+                                    # If all headers are record break out of loop
+                                    if count == 4:
+                                        break
                                 # create email with date and time
                                 email_fields.insert(2,field_datetime)
                                 email = '\n'.join(str(field) for field in email_fields)
-                                print(f"An email from {sending_user} is sent to {user_string} has a content length of {length}\n")
+                                print(f"An email from {sending_user} is sent to {user_string} has a content length of {length}")
                                 store_emails(users,title,email,sending_user)
 
                             elif decodedChoice == "2":
@@ -244,16 +249,16 @@ def receive_email(socket, key):
 
         # check if entire message has been received
         try:
-            decrypted_email = unpad(cipher.decrypt(encrypted_email), AES.block_size).decode()
+            decrypted_email = cipher.decrypt(encrypted_email).decode()
+            #print(decrypted_email)
             if "END_OF_EMAIL" in decrypted_email:
                 email = decrypted_email.split("END_OF_EMAIL")[0]
-                return email
+                break
         except ():
             # continue receiving more data if message is incomplete
             continue
-
     # in case loop exits without returning (it shouldn't in normal conditions)
-    return None
+    return email
 
 def store_emails(users,title,email,sender):
     for user in users:
