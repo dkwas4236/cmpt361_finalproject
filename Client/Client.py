@@ -1,9 +1,4 @@
-'''
-Class: CMPT 361 - AS01
-Instructor: Dr. Mahdi D. Firoozjaei
-Final Project: Secure Mail Transfer Protocol
-Contributors: Brayden van Teeling, Darion Kwasnitza, Hope Oberez, Liam Prsa, Tyler Hardy 
-'''
+# Client.py
 import socket, sys, os, glob, datetime, json
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Util.Padding import pad, unpad
@@ -97,29 +92,18 @@ def client():
                     send_email(email,clientSocket,sym_key)
     
             elif choice == "2":
-                # receive header from server
-                header = decrypt(clientSocket, sym_key)
-                # Display header
-                print(header)
-                # Receive inbox list from server loop and decrypt until END_OF_EMAILS
-                email = ""
-                while email != "END_OF_EMAILS":
-                    email = decrypt(clientSocket, sym_key)
-                    if email != "END_OF_EMAILS":
-                        print(email)
+                # Receive inbox list from server 
+                inboxlist = decrypt(clientSocket, sym_key)
+                print(inboxlist)
 
             elif choice == "3":
                 # Get message from server and get index from user
                 index_prompt = decrypt(clientSocket, sym_key)
-                # Get index from user
+                #print(f'{index_prompt}{input()}')
                 index = input(index_prompt)
+                # Send index back to the server 
                 encrypt(index, clientSocket, sym_key)
-
-                # Get email from server
-                email = decrypt(clientSocket, sym_key)
-                # Display email
-                print(email)
-        
+                
             elif choice == "4":
                 # Client terminates connection with the server 
                 print("The connection is terminated with the server.")
@@ -153,6 +137,7 @@ def encrypt(message, socket, key):
 def decrypt(socket, key):
     # receive data from the socket
     encrypted_data = socket.recv(2048)
+
     # decrypt the data
     cipher = AES.new(key, AES.MODE_ECB)
     plaintext = unpad(cipher.decrypt(encrypted_data), AES.block_size)
@@ -171,22 +156,23 @@ def create_email(username,destinations,title,content):
     email += f"Content Length: {len(content)}\nContent:\n{content}"
     return email
 
-def send_email(email, socket, key):
+def send_email(email,socket,key):
     cipher = AES.new(key, AES.MODE_ECB)
-
-    # combine email and end marker, then pad
+    # combine email and end marker
     email_with_marker = email + "END_OF_EMAIL"
-    padded_email = pad(email_with_marker.encode(), AES.block_size)
-
-    # encrypt the entire padded message
-    encrypted_email = cipher.encrypt(padded_email)
-
+    # Check to see if message needs padding, then encrpyt 
+    if len(email_with_marker) % 16 != 0:
+        padded_email = pad(email_with_marker.encode(), AES.block_size)
+        encrypted_email = cipher.encrypt(padded_email)
+    else:
+        encrypted_email = cipher.encrypt(email_with_marker)
+   
     # send encrypted data in chunks
     chunk_size = 2048
     for i in range(0, len(encrypted_email), chunk_size):
         chunk = encrypted_email[i:i + chunk_size]
         socket.send(chunk)
-
+    
 # call the client function below
 if __name__ == "__main__":
     client()
