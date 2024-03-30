@@ -94,9 +94,13 @@ def server():
 
                                 # Get email from client 
                                 email = receive_email(connectionSocket,sym_key)
-
+                                
                                 email_fields = email.replace("\x10","").splitlines()
                                 ind = 0
+
+                                email_fields = email.splitlines()
+
+
                                 for field in email_fields:
                                     # Get "from" line
                                     if field.startswith("From:"):
@@ -118,8 +122,6 @@ def server():
                                 email = '\n'.join(str(field) for field in email_fields)
                                 print(f"An email from {sending_user} is sent to {user_string} has a content length of {length}\n")
                                 store_emails(users,title,email,sending_user)
-                                    
-                            
 
                             elif decodedChoice == "2":
                                 # based off of the clients username access the proper path to the folder where their emails are stored
@@ -180,6 +182,7 @@ def server():
 
                             elif decodedChoice == "4":
                                 # terminate connection
+                                print("Terminating connection with " + username)
                                 connectionSocket.close()
                                 sys.exit(1)
 
@@ -230,21 +233,27 @@ def decrypt(socket, key):
     plaintext = unpad(cipher.decrypt(encrypted_data), AES.block_size)
     return plaintext.decode()
 
-def receive_email(socket,key):
-    email = b''
+def receive_email(socket, key):
     cipher = AES.new(key, AES.MODE_ECB)
-    # get email chunks and decrypt 
-    while (1):
-        encrypted_chunk = socket.recv(1028)
-        plaintext = unpad(cipher.decrypt(encrypted_chunk), AES.block_size)
-        # End of email
-        if plaintext.endswith(b'END_OF_EMAIL'):
-            email += plaintext[:-len(b'END_OF_EMAIL')]
-            break
-        else:
-            email += plaintext
-    # decode and return 
-    return email.decode()
+    encrypted_email = b''
+
+    while True:
+        chunk = socket.recv(2048)
+
+        encrypted_email += chunk
+
+        # check if entire message has been received
+        try:
+            decrypted_email = unpad(cipher.decrypt(encrypted_email), AES.block_size).decode()
+            if "END_OF_EMAIL" in decrypted_email:
+                email = decrypted_email.split("END_OF_EMAIL")[0]
+                return email
+        except ():
+            # continue receiving more data if message is incomplete
+            continue
+
+    # in case loop exits without returning (it shouldn't in normal conditions)
+    return None
 
 def store_emails(users,title,email,sender):
     for user in users:

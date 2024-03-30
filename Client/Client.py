@@ -171,17 +171,21 @@ def create_email(username,destinations,title,content):
     email += f"Content Length: {len(content)}\nContent:\n{content}"
     return email
 
-def send_email(email,socket,key):
+def send_email(email, socket, key):
     cipher = AES.new(key, AES.MODE_ECB)
-    # encrypt and send email
-    email = email.encode('ascii')
-    email_chunks = [email[i:i+AES.block_size] for i in range(0,len(email),AES.block_size)]
-    for chunk in email_chunks:
-        cipher_chunk = cipher.encrypt(pad(chunk,AES.block_size))
-        socket.send(cipher_chunk)
-    # Send end of email flag
-    cipher_finished = cipher.encrypt(pad(b'END_OF_EMAIL',AES.block_size))
-    socket.send(cipher_finished)
+
+    # combine email and end marker, then pad
+    email_with_marker = email + "END_OF_EMAIL"
+    padded_email = pad(email_with_marker.encode(), AES.block_size)
+
+    # encrypt the entire padded message
+    encrypted_email = cipher.encrypt(padded_email)
+
+    # send encrypted data in chunks
+    chunk_size = 2048
+    for i in range(0, len(encrypted_email), chunk_size):
+        chunk = encrypted_email[i:i + chunk_size]
+        socket.send(chunk)
 
 # call the client function below
 if __name__ == "__main__":
