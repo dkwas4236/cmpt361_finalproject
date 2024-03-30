@@ -1,4 +1,10 @@
-# client_enhances.py
+'''
+Class: CMPT 361 - AS01
+Instructor: Dr. Mahdi D. Firoozjaei
+Final Project: Secure Mail Transfer Protocol
+Contributors: Brayden van Teeling, Darion Kwasnitza, Hope Oberez, Liam Prsa, Tyler Hardy 
+'''
+
 import socket, sys, os, glob, datetime, json
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes

@@ -1,4 +1,10 @@
-# Server.py
+'''
+Class: CMPT 361 - AS01
+Instructor: Dr. Mahdi D. Firoozjaei
+Final Project: Secure Mail Transfer Protocol
+Contributors: Brayden van Teeling, Darion Kwasnitza, Hope Oberez, Liam Prsa, Tyler Hardy 
+'''
+
 import socket, sys, os, glob, datetime, json
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.PublicKey import RSA
@@ -89,7 +95,7 @@ def server():
                                 # Get email from client 
                                 email = receive_email(connectionSocket,sym_key)
 
-                                email_fields = email.splitlines()
+                                email_fields = email.replace("\x10","").splitlines()
                                 ind = 0
                                 for field in email_fields:
                                     # Get "from" line
@@ -116,17 +122,61 @@ def server():
                             
 
                             elif decodedChoice == "2":
-                                # Get inbox list and send to server
-                                inboxlist = "Inbox List Info Displayed"
-                                encrypt(inboxlist, connectionSocket, sym_key)
+                                # based off of the clients username access the proper path to the folder where their emails are stored
+                                user_dir = os.path.join(dir, username)
+                                # get all the files in the users directory
+                                files = glob.glob(user_dir + '/*.txt')
+                                # create a list to store the email subprotocol for the client example of subprotocol below
+                                #Index From          DateTime             Title
+                                #1     client2 2022-07-21 19:29:35.768508 Test2 
+                                # create list header
+                                header = "Index From          DateTime             Title"
+                                # send the header and email list to the client
+                                encrypt(header, connectionSocket, sym_key)
+                            
+                                email_list = []
+                                # loop through all the files in the users directory and get the email information index, sender, date, and title
+                                count = 0
+                                for file in files:
+                                    count += 1
+                                    with open(file, 'r') as email_file:
+                                        email = email_file.readlines()
+                                        # get the sender
+                                        sender = email[1].split(": ")[1].strip()
+                                        # get the date and time
+                                        date_time = email[2].split(": ")[1].strip()
+                                        # get the title
+                                        title = email[3].split(": ")[1].strip()
+                                        # append the email information to the list
+                                        email_list.append(f"{count} {sender} {date_time} {title}")
+                                print(email_list)
+                                # send the email list to the client
+                                for email in email_list:
+                                    encrypt(email, connectionSocket, sym_key)
+                                # send the end of emails tag
+                                encrypt("END_OF_EMAILS", connectionSocket, sym_key)
 
                             elif decodedChoice == "3":
-                                # Send prompt to server
+                                # get the index from the client
                                 response = "Enter the email index you wish to view: "
                                 encrypt(response, connectionSocket, sym_key)
-                                # Receive index from user
-                                index = decrypt(connectionSocket, sym_key)
-                                print(index)
+                                # based off of the clients username access the proper path to the folder where their emails are stored
+                                user_dir = os.path.join(dir, username)
+                                # get all the files in the users directory
+                                files = glob.glob(user_dir + '/*.txt')
+                                print(len(files))
+
+                                # get the index from the client check if smaller then or equal to the number of files
+                                index = int(decrypt(connectionSocket, sym_key))
+                                
+                                # get the email from the file and send it to the client
+                                if index <= len(files):
+                                    with open(files[index-1], 'r') as email_file:
+                                        email = email_file.read()
+                                        encrypt(email, connectionSocket, sym_key)
+                                else:
+                                    encrypt("Invalid index", connectionSocket, sym_key)
+                                
 
                             elif decodedChoice == "4":
                                 # terminate connection
