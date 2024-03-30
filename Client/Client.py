@@ -1,4 +1,9 @@
-# Client.py
+'''
+Class: CMPT 361 - AS01
+Instructor: Dr. Mahdi D. Firoozjaei
+Final Project: Secure Mail Transfer Protocol
+Contributors: Brayden van Teeling, Darion Kwasnitza, Hope Oberez, Liam Prsa, Tyler Hardy 
+'''
 import socket, sys, os, glob, datetime, json
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Util.Padding import pad, unpad
@@ -92,17 +97,28 @@ def client():
                     send_email(email,clientSocket,sym_key)
     
             elif choice == "2":
-                # Receive inbox list from server 
-                inboxlist = decrypt(clientSocket, sym_key)
-                print(inboxlist)
+                # receive header from server
+                header = decrypt(clientSocket, sym_key)
+                # Display header
+                print(header)
+                # Receive inbox list from server loop and decrypt until END_OF_EMAILS
+                email = ""
+                while email != "END_OF_EMAILS":
+                    email = decrypt(clientSocket, sym_key)
+                    if email != "END_OF_EMAILS":
+                        print(email)
 
             elif choice == "3":
-                # Get message from server and get index from user
+               # Get message from server and get index from user
                 index_prompt = decrypt(clientSocket, sym_key)
-                #print(f'{index_prompt}{input()}')
+                # Get index from user
                 index = input(index_prompt)
-                # Send index back to the server 
                 encrypt(index, clientSocket, sym_key)
+
+                # Get email from server
+                email = decrypt(clientSocket, sym_key)
+                # Display email
+                print(email)
                 
             elif choice == "4":
                 # Client terminates connection with the server 
