@@ -102,12 +102,9 @@ def client():
                 # Display header
                 print(header)
                 # Receive inbox list from server loop and decrypt until END_OF_EMAILS
-                email = ""
-                while email != "END_OF_EMAILS":
-                    email = decrypt(clientSocket, sym_key)
-                    if email != "END_OF_EMAILS":
-                        print(email)
-
+                email = receive_email(clientSocket,sym_key)
+           
+                print(email.split("END_OF_EMAILS")[0])
             elif choice == "3":
                # Get message from server and get index from user
                 index_prompt = decrypt(clientSocket, sym_key)
@@ -116,7 +113,7 @@ def client():
                 encrypt(index, clientSocket, sym_key)
 
                 # Get email from server
-                email = decrypt(clientSocket, sym_key)
+                email = receive_email(clientSocket, sym_key)
                 # Display email
                 print(email)
                 
@@ -188,6 +185,28 @@ def send_email(email,socket,key):
     for i in range(0, len(encrypted_email), chunk_size):
         chunk = encrypted_email[i:i + chunk_size]
         socket.send(chunk)
+
+def receive_email(socket, key):
+    cipher = AES.new(key, AES.MODE_ECB)
+    encrypted_email = b''
+
+    while True:
+        chunk = socket.recv(2048)
+
+        encrypted_email += chunk
+
+        # check if entire message has been received
+        try:
+            decrypted_email = cipher.decrypt(encrypted_email).decode()
+            #print(decrypted_email)
+            if "END_OF_EMAIL" in decrypted_email:
+                email = decrypted_email.split("END_OF_EMAIL")[0]
+                break
+        except ():
+            # continue receiving more data if message is incomplete
+            continue
+    # in case loop exits without returning (it shouldn't in normal conditions)
+    return email
     
 # call the client function below
 if __name__ == "__main__":

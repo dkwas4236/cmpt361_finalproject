@@ -137,7 +137,7 @@ def server():
                                 #Index From          DateTime             Title
                                 #1     client2 2022-07-21 19:29:35.768508 Test2 
                                 # create list header
-                                header = "Index From          DateTime             Title"
+                                header = "Index   From          DateTime                      Title"
                                 # send the header and email list to the client
                                 encrypt(header, connectionSocket, sym_key)
                             
@@ -155,11 +155,11 @@ def server():
                                         # get the title
                                         title = email[3].split(": ")[1].strip()
                                         # append the email information to the list
-                                        email_list.append(f"{count} {sender} {date_time} {title}")
-                                print(email_list)
+                                        email_list.append(f"{count:<7} {sender:<14} {date_time:<28} {title}\n")
                                 # send the email list to the client
-                                for email in email_list:
-                                    encrypt(email, connectionSocket, sym_key)
+                                #for email in email_list:
+                                #   encrypt(email, connectionSocket, sym_key)
+                                send_email("".join(email_list),connectionSocket,sym_key)
                                 # send the end of emails tag
                                 encrypt("END_OF_EMAILS", connectionSocket, sym_key)
 
@@ -171,7 +171,6 @@ def server():
                                 user_dir = os.path.join(dir, username)
                                 # get all the files in the users directory
                                 files = glob.glob(user_dir + '/*.txt')
-                                print(len(files))
 
                                 # get the index from the client check if smaller then or equal to the number of files
                                 index = int(decrypt(connectionSocket, sym_key))
@@ -180,7 +179,7 @@ def server():
                                 if index <= len(files):
                                     with open(files[index-1], 'r') as email_file:
                                         email = email_file.read()
-                                        encrypt(email, connectionSocket, sym_key)
+                                        send_email(email, connectionSocket, sym_key)
                                 else:
                                     encrypt("Invalid index", connectionSocket, sym_key)
                                 
@@ -259,6 +258,23 @@ def receive_email(socket, key):
             continue
     # in case loop exits without returning (it shouldn't in normal conditions)
     return email
+
+def send_email(email,socket,key):
+    cipher = AES.new(key, AES.MODE_ECB)
+    # combine email and end marker
+    email_with_marker = email + "END_OF_EMAIL"
+    # Check to see if message needs padding, then encrpyt 
+    if len(email_with_marker) % 16 != 0:
+        padded_email = pad(email_with_marker.encode(), AES.block_size)
+        encrypted_email = cipher.encrypt(padded_email)
+    else:
+        encrypted_email = cipher.encrypt(email_with_marker)
+   
+    # send encrypted data in chunks
+    chunk_size = 2048
+    for i in range(0, len(encrypted_email), chunk_size):
+        chunk = encrypted_email[i:i + chunk_size]
+        socket.send(chunk)
 
 def store_emails(users,title,email,sender):
     for user in users:
