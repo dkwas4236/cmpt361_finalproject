@@ -137,7 +137,7 @@ def server():
                                 #Index From          DateTime             Title
                                 #1     client2 2022-07-21 19:29:35.768508 Test2 
                                 # create list header
-                                header = f"{"Index":<7} {"From":<14} {"DataTime":<28} {"Title"}\n"
+                                header = f"{"Index":<7} {"From":<14} {"DataTime":<28} {"Title"}"
                                 # send the header and email list to the client
                                 encrypt(header, connectionSocket, sym_key)
                             

@@ -70,7 +70,6 @@ def client():
 
         # Loop until user termination
         while(1):
-            
             # Display menu and get user choice
             choice = input(menu)
             # Send choice to server
