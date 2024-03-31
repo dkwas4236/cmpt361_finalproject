@@ -70,6 +70,7 @@ def client():
 
         # Loop until user termination
         while(1):
+            
             # Display menu and get user choice
             choice = input(menu)
             # Send choice to server
@@ -103,8 +104,8 @@ def client():
                 print(header)
                 # Receive inbox list from server loop and decrypt until END_OF_EMAILS
                 email = receive_email(clientSocket,sym_key)
-           
                 print(email.split("END_OF_EMAILS")[0])
+
             elif choice == "3":
                # Get message from server and get index from user
                 index_prompt = decrypt(clientSocket, sym_key)
@@ -128,25 +129,46 @@ def client():
         print('An error occurred:', e)
         sys.exit(1)
 
-# RSA decrypt method for INITIAL handshake between client and server
+'''
+Purpose: RSA decrypt method for INITIAL handshake between client and server
+Parameters: encrypted_message: str value of the message to decrypt
+            private_key: key to decrypt message, private and unique for each client
+returns: decrypted_messgae: the decrypted message
+'''
 def rsa_decrypt(encrypted_message, private_key):
     cipher = PKCS1_OAEP.new(private_key)
     decrypted_message = cipher.decrypt(encrypted_message)
     return decrypted_message
 
-# RSA encrypt method for INITIAL handshake between client and server
+'''
+Purpose: RSA encrypt method for INITIAL handshake between client and server
+Parameters: message: str value of the message to encrypt using the public_key
+            public_key: key to encrypt message using the server's key
+returns: encrypted_messgae: the encrypted message
+'''
 def rsa_encrypt(message, public_key):
     cipher = PKCS1_OAEP.new(public_key)
     encrypted_message = cipher.encrypt(message.encode())
     return encrypted_message
 
-# encrypts messages sent by client using AES (symmetric keys) (all other encrypts after handshake)
+'''
+Purpose: encrypts messages sent by client using AES (symmetric keys) (all other encrypts after handshake)
+Parameters: message: str value of the message to encrypt using the public_key
+            public_key: key to encrypt message using the server's key
+returns: encrypted_messgae: the encrypted message
+'''
 def encrypt(message, socket, key):
     cipher = AES.new(key, AES.MODE_ECB)
     cipher_bytes = cipher.encrypt(pad(message.encode(), AES.block_size))
     socket.send(cipher_bytes)
 
-# decrypts messages sent by serve using AES (symmetric keys) (all other decrypts after handshake)
+
+'''
+Purpose: decrypts messages sent by serve using AES (symmetric keys) (all other decrypts after handshake)
+Parameters: socket: connection with the server 
+            key: use to decrypt the recieved message through the socket
+returns: decrypted message
+'''
 def decrypt(socket, key):
     # receive data from the socket
     encrypted_data = socket.recv(2048)
@@ -156,7 +178,15 @@ def decrypt(socket, key):
     plaintext = unpad(cipher.decrypt(encrypted_data), AES.block_size)
     return plaintext.decode()
 
-def create_email(username,destinations,title,content):
+'''
+Purpose: Format the given paramaeters into an email
+Parameters: username: the user thats sending the email
+            destinations: the usernames of the user(s) receiving the email
+            title: email title
+            content: content of the email
+returns: formatted str value of an email
+'''
+def create_email(username, destinations, title, content):
     email =f"From: {username}\nTo: {destinations}\n"
     # check length of title and add to email
     if len(title) > 100: 
@@ -169,6 +199,12 @@ def create_email(username,destinations,title,content):
     email += f"Content Length: {len(content)}\nContent:\n{content}"
     return email
 
+'''
+Purpose: send an email through the server
+Parameters: email: email to send
+            socket: connection to the server
+            key: to encrypt the email
+'''
 def send_email(email,socket,key):
     cipher = AES.new(key, AES.MODE_ECB)
     # combine email and end marker
@@ -186,6 +222,12 @@ def send_email(email,socket,key):
         chunk = encrypted_email[i:i + chunk_size]
         socket.send(chunk)
 
+'''
+Purpose: receive email
+Parameters: socket: connection to the server
+            key: use to decrypt the email
+returns: str value of decrypted email
+'''
 def receive_email(socket, key):
     cipher = AES.new(key, AES.MODE_ECB)
     encrypted_email = b''
