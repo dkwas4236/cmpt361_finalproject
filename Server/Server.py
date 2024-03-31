@@ -57,25 +57,25 @@ def server():
                     # check if username & password is valid
                     authorization = " "
                     sym_key = None
-                    for db_username in data.keys():
-                        if db_username == username:
-                            db_password = data[db_username]
-                            if password == db_password:
-                                authorization = "AUTHORIZED"
-                                connectionSocket.send(authorization.encode('ascii'))
-                                # retrieve the clients public keys
-                                client_public_key_file = os.path.join(dir,'%s_public.pem' % username)
-                                with open(client_public_key_file, 'rb') as file:
-                                    client_public_key = RSA.import_key(file.read())
-                                # create the sym_key, encode it, and send it
-                                sym_key = generate_key()
-                                symkey_encrypted = rsa_encrypt(sym_key, client_public_key)
-                                # send length of encrypted key
-                                connectionSocket.send(len(symkey_encrypted).to_bytes(4, 'big'))
-                                connectionSocket.send(symkey_encrypted)
-                                print("Connection Accepted and Symmetric Key Generated for client: " + username)
-                                break
 
+                    if username in data:
+                        db_password = data[username]
+                        if password == db_password:
+                            authorization = "AUTHORIZED"
+                            connectionSocket.send(authorization.encode('ascii'))
+                            # retrieve the clients public keys
+                            client_public_key_file = os.path.join(dir,'%s_public.pem' % username)
+                            with open(client_public_key_file, 'rb') as file:
+                                client_public_key = RSA.import_key(file.read())
+                            # create the sym_key, encode it, and send it
+                            sym_key = generate_key()
+                            symkey_encrypted = rsa_encrypt(sym_key, client_public_key)
+                            # send length of encrypted key
+                            connectionSocket.send(len(symkey_encrypted).to_bytes(4, 'big'))
+                            connectionSocket.send(symkey_encrypted)
+                            print("Connection Accepted and Symmetric Key Generated for client: " + username)
+
+                    # Terminate connection if username and password information recieved is invalid
                     if authorization == "AUTHORIZED":
                         # receive the "OK"
                         decrypt(connectionSocket, sym_key)
@@ -137,7 +137,7 @@ def server():
                                 #Index From          DateTime             Title
                                 #1     client2 2022-07-21 19:29:35.768508 Test2 
                                 # create list header
-                                header = "Index   From          DateTime                      Title"
+                                header = f"{"Index":<7} {"From":<14} {"DataTime":<28} {"Title"}"
                                 # send the header and email list to the client
                                 encrypt(header, connectionSocket, sym_key)
                             
@@ -209,25 +209,45 @@ def server():
                 serverSocket.close()
                 sys.exit(1)
 
-# RSA decrypt method for INITIAL handshake between client and server
+'''
+Purpose: RSA decrypt method for INITIAL handshake between client and server
+Parameters: encrypted_message: str value of the message to decrypt
+            private_key: key to decrypt message, private and unique for each client
+returns: decrypted_messgae: the decrypted message
+'''
 def rsa_decrypt(encrypted_message, private_key):
     cipher = PKCS1_OAEP.new(private_key)
     decrypted_message = cipher.decrypt(encrypted_message)
     return decrypted_message
 
-# RSA encrypt method for INITIAL handshake between client and server
+'''
+Purpose: RSA encrypt method for INITIAL handshake between client and server
+Parameters: message: str value of the message to encrypt using the public_key
+            public_key: key to encrypt message using the server's key
+returns: encrypted_messgae: the encrypted message
+'''
 def rsa_encrypt(message, public_key):
     cipher = PKCS1_OAEP.new(public_key)
     encrypted_message = cipher.encrypt(message)
     return encrypted_message
 
-# encrypts messages sent by server using AES (symmetric keys) (all other encrypts after handshake)
+'''
+Purpose: encrypts messages sent by client using AES (symmetric keys) (all other encrypts after handshake)
+Parameters: message: str value of the message to encrypt using the public_key
+            public_key: key to encrypt message using the server's key
+returns: encrypted_messgae: the encrypted message
+'''
 def encrypt(message, socket, key):
     cipher = AES.new(key, AES.MODE_ECB)
     cipher_bytes = cipher.encrypt(pad(message.encode(), AES.block_size))
     socket.send(cipher_bytes)
 
-# decrypts messages sent by client using AES (symmetric keys) (all other decrypts after handshake)
+'''
+Purpose: decrypts messages sent by serve using AES (symmetric keys) (all other decrypts after handshake)
+Parameters: socket: connection with the server 
+            key: use to decrypt the recieved message through the socket
+returns: decrypted message
+'''
 def decrypt(socket, key):
     # receive data from the socket
     encrypted_data = socket.recv(2048)
@@ -237,6 +257,12 @@ def decrypt(socket, key):
     plaintext = unpad(cipher.decrypt(encrypted_data), AES.block_size)
     return plaintext.decode()
 
+'''
+Purpose: receive email
+Parameters: socket: connection to the server
+            key: use to decrypt the email
+returns: str value of decrypted email
+'''
 def receive_email(socket, key):
     cipher = AES.new(key, AES.MODE_ECB)
     encrypted_email = b''
@@ -259,6 +285,12 @@ def receive_email(socket, key):
     # in case loop exits without returning (it shouldn't in normal conditions)
     return email
 
+'''
+Purpose: send an email through the server
+Parameters: email: email to send
+            socket: connection to the server
+            key: to encrypt the email
+'''
 def send_email(email,socket,key):
     cipher = AES.new(key, AES.MODE_ECB)
     # combine email and end marker
@@ -276,6 +308,13 @@ def send_email(email,socket,key):
         chunk = encrypted_email[i:i + chunk_size]
         socket.send(chunk)
 
+'''
+Purpose: store email in the inbox of the receivers
+Parameters: users: the usernames of the user(s) receiving the email
+            title: email title
+            email: contents and information of the email
+            sender: user who sent the email
+'''
 def store_emails(users,title,email,sender):
     for user in users:
         dir = os.path.dirname(os.path.abspath(__file__))
@@ -283,11 +322,14 @@ def store_emails(users,title,email,sender):
         with open(os.path.join(dir,filename), 'w') as email_file:
             email_file.write(email)
 
-# generates a 256 AES key ( 256 = 32 bytes) that will be exchanged with client
+'''
+Purpose: generates a 256 AES key ( 256 = 32 bytes) that will be exchanged with client
+Parameters: key_size: size of the key with default value set to 32 if none is given
+Return: cryptographically strong random bytes
+'''           
 def generate_key(key_size=32):
     return get_random_bytes(key_size)
 
 # call the server function below
 if __name__ == "__main__":
     server()
-
