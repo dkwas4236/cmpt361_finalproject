@@ -146,8 +146,6 @@ def server():
                                 inbox = create_inbox(files)
 
                                 send_email(inbox,connectionSocket,sym_key)
-                                # send the end of emails tag
-                                encrypt("END_OF_EMAILS", connectionSocket, sym_key)
 
                             elif decodedChoice == "3":
                                 # get the index from the client

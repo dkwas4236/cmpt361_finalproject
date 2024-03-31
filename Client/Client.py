@@ -103,7 +103,7 @@ def client():
                 print(header)
                 # Receive inbox list from server loop and decrypt until END_OF_EMAILS
                 email = receive_email(clientSocket,sym_key)
-                print(email.split("END_OF_EMAILS")[0])
+                print(email)
 
             elif choice == "3":
                # Get message from server and get index from user
