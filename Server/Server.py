@@ -155,10 +155,11 @@ def server():
                                         # get the title
                                         title = email[3].split(": ")[1].strip()
                                         # append the email information to the list
-                                        email_list.append(f"{count:<7} {sender:<14} {date_time:<28} {title}")
+                                        email_list.append(f"{count:<7} {sender:<14} {date_time:<28} {title}\n")
                                 # send the email list to the client
-                                for email in email_list:
-                                    encrypt(email, connectionSocket, sym_key)
+                                #for email in email_list:
+                                #   encrypt(email, connectionSocket, sym_key)
+                                send_email("".join(email_list),connectionSocket,sym_key)
                                 # send the end of emails tag
                                 encrypt("END_OF_EMAILS", connectionSocket, sym_key)
 

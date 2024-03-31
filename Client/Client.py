@@ -102,14 +102,9 @@ def client():
                 # Display header
                 print(header)
                 # Receive inbox list from server loop and decrypt until END_OF_EMAILS
-                email = ""
-                while True:
-                    email = decrypt(clientSocket, sym_key)
-                    if email.endswith("END_OF_EMAILS"):
-                        print(email.split("END_OF_EMAILS")[0])
-                        break
-                    else:
-                        print(email)
+                email = receive_email(clientSocket,sym_key)
+           
+                print(email.split("END_OF_EMAILS")[0])
             elif choice == "3":
                # Get message from server and get index from user
                 index_prompt = decrypt(clientSocket, sym_key)
