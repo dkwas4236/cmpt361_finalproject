@@ -132,7 +132,7 @@ def client():
 Purpose: RSA decrypt method for INITIAL handshake between client and server
 Parameters: encrypted_message: str value of the message to decrypt
             private_key: key to decrypt message, private and unique for each client
-returns: decrypted_messgae: the decrypted message
+Return: decrypted_messgae: the decrypted message
 '''
 def rsa_decrypt(encrypted_message, private_key):
     cipher = PKCS1_OAEP.new(private_key)
@@ -143,7 +143,7 @@ def rsa_decrypt(encrypted_message, private_key):
 Purpose: RSA encrypt method for INITIAL handshake between client and server
 Parameters: message: str value of the message to encrypt using the public_key
             public_key: key to encrypt message using the server's key
-returns: encrypted_messgae: the encrypted message
+Return: encrypted_messgae: the encrypted message
 '''
 def rsa_encrypt(message, public_key):
     cipher = PKCS1_OAEP.new(public_key)
@@ -154,7 +154,7 @@ def rsa_encrypt(message, public_key):
 Purpose: encrypts messages sent by client using AES (symmetric keys) (all other encrypts after handshake)
 Parameters: message: str value of the message to encrypt using the public_key
             public_key: key to encrypt message using the server's key
-returns: encrypted_messgae: the encrypted message
+Return: encrypted_messgae: the encrypted message
 '''
 def encrypt(message, socket, key):
     cipher = AES.new(key, AES.MODE_ECB)
@@ -166,7 +166,7 @@ def encrypt(message, socket, key):
 Purpose: decrypts messages sent by serve using AES (symmetric keys) (all other decrypts after handshake)
 Parameters: socket: connection with the server 
             key: use to decrypt the recieved message through the socket
-returns: decrypted message
+Return: decrypted message
 '''
 def decrypt(socket, key):
     # receive data from the socket
@@ -183,7 +183,7 @@ Parameters: username: the user thats sending the email
             destinations: the usernames of the user(s) receiving the email
             title: email title
             content: content of the email
-returns: formatted str value of an email
+Return: formatted str value of an email
 '''
 def create_email(username, destinations, title, content):
     email =f"From: {username}\nTo: {destinations}\n"
@@ -225,7 +225,7 @@ def send_email(email,socket,key):
 Purpose: receive email
 Parameters: socket: connection to the server
             key: use to decrypt the email
-returns: str value of decrypted email
+Return: str value of decrypted email
 '''
 def receive_email(socket, key):
     cipher = AES.new(key, AES.MODE_ECB)

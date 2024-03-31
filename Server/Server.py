@@ -129,37 +129,23 @@ def server():
                                 store_emails(users,title,email,sending_user)
 
                             elif decodedChoice == "2":
-                                # based off of the clients username access the proper path to the folder where their emails are stored
+                                 # based off of the clients username access the proper path to the folder where their emails are stored
                                 user_dir = os.path.join(dir, username)
                                 # get all the files in the users directory
                                 files = glob.glob(user_dir + '/*.txt')
-                                # create a list to store the email subprotocol for the client example of subprotocol below
-                                #Index From          DateTime             Title
-                                #1     client2 2022-07-21 19:29:35.768508 Test2 
+                                
+                                # create a inbox in example of subprotocol below
+                                #Index      From          DateTime                      Title
+                                #1          client2       2022-07-21 19:29:35.768508    Test2 
                                 # create list header
                                 header = f"{"Index":<7} {"From":<14} {"DataTime":<28} {"Title"}"
                                 # send the header and email list to the client
                                 encrypt(header, connectionSocket, sym_key)
-                            
-                                email_list = []
-                                # loop through all the files in the users directory and get the email information index, sender, date, and title
-                                count = 0
-                                for file in files:
-                                    count += 1
-                                    with open(file, 'r') as email_file:
-                                        email = email_file.readlines()
-                                        # get the sender
-                                        sender = email[1].split(": ")[1].strip()
-                                        # get the date and time
-                                        date_time = email[2].split(": ")[1].strip()
-                                        # get the title
-                                        title = email[3].split(": ")[1].strip()
-                                        # append the email information to the list
-                                        email_list.append(f"{count:<7} {sender:<14} {date_time:<28} {title}\n")
-                                # send the email list to the client
-                                #for email in email_list:
-                                #   encrypt(email, connectionSocket, sym_key)
-                                send_email("".join(email_list),connectionSocket,sym_key)
+
+                                # list of emails formatted in a single sring
+                                inbox = create_inbox(files)
+
+                                send_email(inbox,connectionSocket,sym_key)
                                 # send the end of emails tag
                                 encrypt("END_OF_EMAILS", connectionSocket, sym_key)
 
@@ -213,7 +199,7 @@ def server():
 Purpose: RSA decrypt method for INITIAL handshake between client and server
 Parameters: encrypted_message: str value of the message to decrypt
             private_key: key to decrypt message, private and unique for each client
-returns: decrypted_messgae: the decrypted message
+Return: decrypted_messgae: the decrypted message
 '''
 def rsa_decrypt(encrypted_message, private_key):
     cipher = PKCS1_OAEP.new(private_key)
@@ -224,7 +210,7 @@ def rsa_decrypt(encrypted_message, private_key):
 Purpose: RSA encrypt method for INITIAL handshake between client and server
 Parameters: message: str value of the message to encrypt using the public_key
             public_key: key to encrypt message using the server's key
-returns: encrypted_messgae: the encrypted message
+Return: encrypted_messgae: the encrypted message
 '''
 def rsa_encrypt(message, public_key):
     cipher = PKCS1_OAEP.new(public_key)
@@ -235,7 +221,7 @@ def rsa_encrypt(message, public_key):
 Purpose: encrypts messages sent by client using AES (symmetric keys) (all other encrypts after handshake)
 Parameters: message: str value of the message to encrypt using the public_key
             public_key: key to encrypt message using the server's key
-returns: encrypted_messgae: the encrypted message
+Return: encrypted_messgae: the encrypted message
 '''
 def encrypt(message, socket, key):
     cipher = AES.new(key, AES.MODE_ECB)
@@ -246,7 +232,7 @@ def encrypt(message, socket, key):
 Purpose: decrypts messages sent by serve using AES (symmetric keys) (all other decrypts after handshake)
 Parameters: socket: connection with the server 
             key: use to decrypt the recieved message through the socket
-returns: decrypted message
+Return: decrypted message
 '''
 def decrypt(socket, key):
     # receive data from the socket
@@ -261,7 +247,7 @@ def decrypt(socket, key):
 Purpose: receive email
 Parameters: socket: connection to the server
             key: use to decrypt the email
-returns: str value of decrypted email
+Return: str value of decrypted email
 '''
 def receive_email(socket, key):
     cipher = AES.new(key, AES.MODE_ECB)
@@ -329,6 +315,38 @@ Return: cryptographically strong random bytes
 '''           
 def generate_key(key_size=32):
     return get_random_bytes(key_size)
+
+'''
+Purpose: create an inbox from the files in the user directory sorted by date and time
+Parameters: files: .txt files in the user's directory
+Return: inbox: list of emails formatted into a string
+'''  
+def create_inbox(files):
+    email_list = []
+    # loop through all the files in the users directory and get the email information index, sender, date, and title
+    count = 0
+    for file in files:
+        count += 1
+        with open(file, 'r') as email_file:
+            email = email_file.readlines()
+            # get the sender
+            sender = email[1].split(": ")[1].strip()
+            # get the date and time
+            date_time = email[2].split(": ")[1].strip()
+            # get the title
+            title = email[3].split(": ")[1].strip()
+            # append the email information to the list
+            email_list.append([count, sender, date_time, title])
+
+    # sort email list by the date and time (index 2 of each email in list)
+    email_list.sort(key=lambda email: email[2])        
+
+    # convert the list of emails into a single string
+    inbox = ""
+    for email in email_list:
+        inbox = inbox + (f"{email[0]:<7} {email[1]:<14} {email[2]:<28} {email[3]}\n")
+    
+    return inbox
 
 # call the server function below
 if __name__ == "__main__":
