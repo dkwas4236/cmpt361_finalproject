@@ -150,12 +150,13 @@ def server():
                                 for email in email_list:
                                     inbox = inbox + (f"{count:<7} {email[0]:<14} {email[1]:<28} {email[2]}\n")
                                     count += 1
+
                                 # list of emails formatted in a single sring
 
                                 send_email(inbox,connectionSocket,sym_key)
 
                             elif decodedChoice == "3":
-                                # get the index from the client
+                                 # get the index from the client
                                 response = "Enter the email index you wish to view: "
                                 encrypt(response, connectionSocket, sym_key)
                                 # based off of the clients username access the proper path to the folder where their emails are stored
@@ -310,9 +311,12 @@ def store_emails(users,title,email,sender):
     for user in users:
         dir = os.path.dirname(os.path.abspath(__file__))
         filename = f'{user}/{sender}_{title.replace(" ","_")}.txt'
-        with open(os.path.join(dir,filename), 'w') as email_file:
-            email_file.write(email)
-
+        try:
+            with open(os.path.join(dir,filename), 'w') as email_file:
+                email_file.write(email)
+        except:
+            # If invalid user print error message
+            print(f"Email failed to send to {user}. {user} is not a valid user.")
 '''
 Purpose: generates a 256 AES key ( 256 = 32 bytes) that will be exchanged with client
 Parameters: key_size: size of the key with default value set to 32 if none is given
@@ -333,7 +337,7 @@ def sort_by_date(files):
         with open(file, 'r') as email_file:
             email = email_file.readlines()
             # get the sender
-            sender = email[1].split(": ")[1].strip()
+            sender = email[0].split(": ")[1].strip()
             # get the date and time
             date_time = email[2].split(": ")[1].strip()
             # get the title
@@ -347,8 +351,6 @@ def sort_by_date(files):
     # convert the list of emails into a single string
     
     return email_list
-
-
 
 # call the server function below
 if __name__ == "__main__":

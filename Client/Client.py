@@ -82,17 +82,32 @@ def client():
                     destinations = input("Enter destinations (seperated by;): ")
                     # Get title from user
                     title = input("Enter Title: ")
-                    # Does the user want to attach a file to the email?
-                    fileAttached = input("Would you like to load contents from a file?(Y/N) ")
-                    if (fileAttached.strip() == 'N' or fileAttached.strip() == 'n'):
-                        # Contentes recieved from command line 
-                        print("Enter Message Contents: ")
-                        contents = input()
-                    else:
-                        filename = input("Enter filename: ")
-                        with open(os.path.join(dir,filename),'r') as file:
-                            contents = file.read()
+                    
+                    # loop until inputs are successful 
+                    while True:
+                         # Does the user want to attach a file to the email?
+                        fileAttached = input("Would you like to load contents from a file?(Y/N) ")
+                        accepted_inputs = ["y","Y","N","n"]
+                        while(fileAttached.strip() not in accepted_inputs):
+                            fileAttached = input("Would you like to load contents from a file?(Y/N) ")
+                        if (fileAttached.strip() == 'N' or fileAttached.strip() == 'n'):
+                            # Content recieved from command line 
+                            print("Enter Message Contents: ")
+                            contents = input()
+                            # Do not need to error check for file, break loop
+                            break
+                        else:
+                            filename = input("Enter filename: ")
+                            try:
+                                # If file is found break loop
+                                with open(os.path.join(dir,filename),'r') as file:
+                                    contents = file.read()
+                                break
+                            except:
+                                # File was not found. Display error and restart loop
+                                print(f"File '{filename}' was not found.")
 
+                    # Create email and send
                     email = create_email(username,destinations,title,contents)
                     send_email(email,clientSocket,sym_key)
     
@@ -115,7 +130,7 @@ def client():
                 # Get email from server
                 email = receive_email(clientSocket, sym_key)
                 # Display email
-                print(email)
+                print(f"\n{email}")
                 
             elif choice == "4":
                 # Client terminates connection with the server 
