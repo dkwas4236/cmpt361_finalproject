@@ -84,6 +84,9 @@ def client():
                     title = input("Enter Title: ")
                     # Does the user want to attach a file to the email?
                     fileAttached = input("Would you like to load contents from a file?(Y/N) ")
+                    accepted_inputs = ["y","Y","N","n"]
+                    while(fileAttached.strip() not in accepted_inputs):
+                        fileAttached = input("Would you like to load contents from a file?(Y/N) ")
                     if (fileAttached.strip() == 'N' or fileAttached.strip() == 'n'):
                         # Contentes recieved from command line 
                         print("Enter Message Contents: ")
@@ -115,7 +118,7 @@ def client():
                 # Get email from server
                 email = receive_email(clientSocket, sym_key)
                 # Display email
-                print(email)
+                print(f"\n{email}")
                 
             elif choice == "4":
                 # Client terminates connection with the server 

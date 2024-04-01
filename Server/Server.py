@@ -328,7 +328,7 @@ def create_inbox(files):
         with open(file, 'r') as email_file:
             email = email_file.readlines()
             # get the sender
-            sender = email[1].split(": ")[1].strip()
+            sender = email[0].split(": ")[1].strip()
             # get the date and time
             date_time = email[2].split(": ")[1].strip()
             # get the title
