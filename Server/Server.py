@@ -142,8 +142,15 @@ def server():
                                 # send the header and email list to the client
                                 encrypt(header, connectionSocket, sym_key)
 
+                                email_list = sort_by_date(files)
+
+                                # convert list of emails into a single string
+                                count = 1
+                                inbox = ""
+                                for email in email_list:
+                                    inbox = inbox + (f"{count:<7} {email[0]:<14} {email[1]:<28} {email[2]}\n")
+                                    count += 1
                                 # list of emails formatted in a single sring
-                                inbox = create_inbox(files)
 
                                 send_email(inbox,connectionSocket,sym_key)
 
@@ -155,17 +162,17 @@ def server():
                                 user_dir = os.path.join(dir, username)
                                 # get all the files in the users directory
                                 files = glob.glob(user_dir + '/*.txt')
+                                email_list = sort_by_date(files)
 
-                                # get the index from the client check if smaller then or equal to the number of files
                                 index = int(decrypt(connectionSocket, sym_key))
-                                
-                                # get the email from the file and send it to the client
-                                if index <= len(files):
-                                    with open(files[index-1], 'r') as email_file:
+
+                                if index > 0 and index <= len(email_list):
+                                    with open(email_list[index-1][3], 'r') as email_file:
                                         email = email_file.read()
                                         send_email(email, connectionSocket, sym_key)
+                                
                                 else:
-                                    encrypt("Invalid index", connectionSocket, sym_key)
+                                     encrypt("Invalid index", connectionSocket, sym_key)
                                 
 
                             elif decodedChoice == "4":
@@ -315,16 +322,14 @@ def generate_key(key_size=32):
     return get_random_bytes(key_size)
 
 '''
-Purpose: create an inbox from the files in the user directory sorted by date and time
+Purpose: Sort  the files in the user directory by date and time
 Parameters: files: .txt files in the user's directory
-Return: inbox: list of emails formatted into a string
+Return: email_list: list of emails
 '''  
-def create_inbox(files):
+def sort_by_date(files):
     email_list = []
     # loop through all the files in the users directory and get the email information index, sender, date, and title
-    count = 0
     for file in files:
-        count += 1
         with open(file, 'r') as email_file:
             email = email_file.readlines()
             # get the sender
@@ -334,17 +339,16 @@ def create_inbox(files):
             # get the title
             title = email[3].split(": ")[1].strip()
             # append the email information to the list
-            email_list.append([count, sender, date_time, title])
+            email_list.append([sender, date_time, title, file])
 
     # sort email list by the date and time (index 2 of each email in list)
-    email_list.sort(key=lambda email: email[2])        
+    email_list.sort(key=lambda email: email[1])        
 
     # convert the list of emails into a single string
-    inbox = ""
-    for email in email_list:
-        inbox = inbox + (f"{email[0]:<7} {email[1]:<14} {email[2]:<28} {email[3]}\n")
     
-    return inbox
+    return email_list
+
+
 
 # call the server function below
 if __name__ == "__main__":
