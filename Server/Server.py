@@ -151,6 +151,8 @@ def server():
                                     inbox = inbox + (f"{count:<7} {email[0]:<14} {email[1]:<28} {email[2]}\n")
                                     count += 1
 
+                                # list of emails formatted in a single sring
+
                                 send_email(inbox,connectionSocket,sym_key)
 
                             elif decodedChoice == "3":
