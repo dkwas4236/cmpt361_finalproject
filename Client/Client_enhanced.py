@@ -10,7 +10,6 @@ from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from Crypto.PublicKey import RSA
-from Crypto.Hash import HMAC, SHA256
 
 def client():
     serverPort = 13000
@@ -62,36 +61,27 @@ def client():
             while len(symkey_encrypted) < encrypted_length:
                 part = clientSocket.recv(encrypted_length - len(symkey_encrypted))
                 symkey_encrypted += part
-            sym_key = rsa_decrypt(symkey_encrypted, client_private_key)
-
-            # receive length of encrypted hmac key
-            encrypted_length = int.from_bytes(clientSocket.recv(4), 'big')
-            hmackey_encrypted = b''
-            while len(hmackey_encrypted) < encrypted_length:
-                part = clientSocket.recv(encrypted_length - len(hmackey_encrypted))
-                hmackey_encrypted += part
             
             # decrypt both keys
             sym_key = rsa_decrypt(symkey_encrypted, client_private_key)
-            hmac_key = rsa_decrypt(hmackey_encrypted, client_private_key)
-            encrypt("OK", clientSocket, sym_key, hmac_key)
+            encrypt("OK", clientSocket, sym_key)
         else:
             termination = clientSocket.recv(2048).decode('ascii')
             print(termination)
             sys.exit(1)
 
         # Receive menu from server
-        menu = decrypt(clientSocket, sym_key, hmac_key)
+        menu = decrypt(clientSocket, sym_key)
 
         # Loop until user termination
         while(1):
             # Display menu and get user choice
             choice = input(menu)
             # Send choice to server
-            encrypt(choice, clientSocket, sym_key, hmac_key)
+            encrypt(choice, clientSocket, sym_key)
             if choice == "1":
                 # get email prompt 
-                emailPrompt = decrypt(clientSocket, sym_key, hmac_key)
+                emailPrompt = decrypt(clientSocket, sym_key)
                 if emailPrompt == "Send the email":
                     # Get destinations from user 
                     destinations = input("Enter destinations (seperated by;): ")
@@ -123,29 +113,29 @@ def client():
 
                     # Create email and send
                     email = create_email(username,destinations,title,contents)
-                    send_email(email,clientSocket,sym_key,hmac_key)
+                    send_email(email,clientSocket,sym_key)
     
             elif choice == "2":
                  # receive header from server
-                header = decrypt(clientSocket, sym_key, hmac_key)
+                header = decrypt(clientSocket, sym_key)
                 # Display header
                 print(header)
                 # Receive inbox list from server loop and decrypt until END_OF_EMAILS
                 # using receive email ensures that if inbox is large, client will receive
                 # all of it 
-                inbox = receive_email(clientSocket,sym_key, hmac_key)
+                inbox = receive_email(clientSocket,sym_key)
            
                 print(inbox.split("END_OF_EMAILS")[0])
 
             elif choice == "3":
                # Get message from server and get index from user
-                index_prompt = decrypt(clientSocket, sym_key, hmac_key)
+                index_prompt = decrypt(clientSocket, sym_key)
                 # Get index from user
                 index = input(index_prompt)
-                encrypt(index, clientSocket, sym_key, hmac_key)
+                encrypt(index, clientSocket, sym_key)
 
                 # Get email from server
-                email = receive_email(clientSocket, sym_key, hmac_key)
+                email = receive_email(clientSocket, sym_key)
                 # Display email
                 print(f"\n{email}")
                 
@@ -161,8 +151,6 @@ def client():
         sys.exit(1)
 
 '''
-Need to copy and paste rest of client program into here when it is finished
-
 # simple testing functionality to demonstrate tampering
 message = 'Hello World!'
 encrypt(message, clientSocket, sym_key, hmac_key)
@@ -180,61 +168,39 @@ def rsa_encrypt(message, public_key):
     encrypted_message = cipher.encrypt(message.encode())
     return encrypted_message
 
-# new function uses hash function SHA256 and nonce (number used once) to enhance security
-def encrypt(message, socket, sym_key, hmac_key):
-    # generate a nonce
+# new function uses nonce (number used once) to enhance security
+def encrypt(message, socket, sym_key):
+    # generate nonce
     nonce = get_random_bytes(AES.block_size)
+    # print statement demonstrates functionality of nonce
+    print(f"Encrypt: Nonce = {nonce.hex()}")
 
     # append nonce to message
     message_with_nonce = nonce + message.encode()
 
     # encrypt the message
     cipher = AES.new(sym_key, AES.MODE_ECB)
-    cipher_bytes = cipher.encrypt(pad(message_with_nonce, AES.block_size))
+    encrypted_message = cipher.encrypt(pad(message_with_nonce, AES.block_size))
 
-    # generate HMAC
-    hmac = HMAC.new(hmac_key, digestmod=SHA256)
-    hmac.update(cipher_bytes)
-    hmac_digest = hmac.digest()
+    # send encrypted message
+    socket.send(encrypted_message)
 
-    # append HMAC to encrypted message
-    encrypted_message_with_hmac = cipher_bytes + hmac_digest
-
-    socket.send(encrypted_message_with_hmac)
-
-# new function uses hash function SHA256 and nonce (number used once) to enhance security
-def decrypt(socket, sym_key, hmac_key):
-    # receive data from the socket ( + SHA256.digest_size = size adjustment needed for the SHA)
-    received_data = socket.recv(2048 + SHA256.digest_size)
-
-    # separate encrypted data and HMAC
-    encrypted_data = received_data[:-SHA256.digest_size]
-    received_hmac = received_data[-SHA256.digest_size:]
-
-    # verify HMAC
-    hmac = HMAC.new(hmac_key, digestmod=SHA256)
-    hmac.update(encrypted_data)
-    try:
-        hmac.verify(received_hmac)
-    except ValueError:
-        raise ValueError("Tampering detected. Invalid message or key")
+# new function uses nonce (number used once) to enhance security
+def decrypt(socket, sym_key):
+    # receive encrypted data
+    encrypted_message = socket.recv(2048)
 
     # decrypt the data
     cipher = AES.new(sym_key, AES.MODE_ECB)
-    decrypted_data_with_nonce = cipher.decrypt(encrypted_data)
+    decrypted_data = cipher.decrypt(encrypted_message)
 
     # remove padding and nonce
-    plaintext = unpad(decrypted_data_with_nonce, AES.block_size)[AES.block_size:]
+    extracted_nonce = decrypted_data[:AES.block_size]
+    plaintext = unpad(decrypted_data, AES.block_size)[AES.block_size:]
 
+    # print statement demonstrates functionality of nonce
+    print(f"Decrypt: Extracted Nonce = {extracted_nonce.hex()}")
     return plaintext.decode()
-
-# function that tampers with data to test new HMAC functionality
-def tamper_data(data):
-    # change bytes in encrypted data to simulate tampering
-    tampered_data = bytearray(data)
-    # flip bit in data
-    tampered_data[10] = tampered_data[10] ^ 1
-    return bytes(tampered_data)
 
 # generates a 256 AES key ( 256 = 32 bytes) that will be exchanged with client
 # can also generate an HMAC key
@@ -244,17 +210,17 @@ def generate_key(key_size=32):
 def create_email(username,destinations,title,content):
     email =f"From: {username}\nTo: {destinations}\n"
     # check length of title and add to email
-    if len(title) > 100: 
+    if len(title) > 100:
         title = title[0:99]
     email += f"Title: {title}\n"
-    # check for txt file or command line entry 
+    # check for txt file or command line entry
 
     if len(content)>1000000:
         content = content[0:999999]
     email += f"Content Length: {len(content)}\nContent:\n{content}"
     return email
 
-def send_email(email,socket,symkey, hmac_key):
+def send_email(email,socket,symkey):
     # generate a nonce
     nonce = get_random_bytes(AES.block_size)
     # append nonce and end of email marker to message
@@ -262,49 +228,28 @@ def send_email(email,socket,symkey, hmac_key):
     email = email + "END_OF_EMAIL"
     email = nonce + email.encode()
 
-    # generate HMAC
-    hmac = HMAC.new(hmac_key, digestmod=SHA256)
-    
     cipher = AES.new(symkey, AES.MODE_ECB)
-    
-    # Check to see if message needs padding, then encrpyt 
+
+    # Check to see if message needs padding, then encrpyt
     if len(email) % 16 != 0:
         padded_email = pad(email, AES.block_size)
         encrypted_email = cipher.encrypt(padded_email)
-        hmac.update(encrypted_email)
-        hmac_digest = hmac.digest()
-        encrypted_email = encrypted_email + hmac_digest
     else:
         encrypted_email = cipher.encrypt(email)
-        hmac.update(encrypted_email)
-        hmac_digest = hmac.digest()
-        encrypted_email = encrypted_email + hmac_digest
-   
+
     # send encrypted data in chunks
     chunk_size = 2048
     for i in range(0, len(encrypted_email), chunk_size):
         chunk = encrypted_email[i:i + chunk_size]
         socket.send(chunk)
 
-def receive_email(socket, symkey, hmac_key):
+def receive_email(socket, symkey):
     cipher = AES.new(symkey, AES.MODE_ECB)
     encrypted_email = b''
     count = 0
     while True:
-        # receive data from the socket ( + SHA256.digest_size = size adjustment needed for the SHA)
-        chunk = socket.recv(2048 + SHA256.digest_size)
-
-        # separate encrypted data and HMAC
-        encrypted_chunk = chunk[:-SHA256.digest_size]
-        chunk_hmac = chunk[-SHA256.digest_size:]
-
-        # verify HMAC
-        hmac = HMAC.new(hmac_key, digestmod=SHA256)
-        hmac.update(encrypted_chunk)
-        #try:
-        #    hmac.verify(chunk_hmac)
-        #except ValueError:
-        #    raise ValueError("Tampering detected. Invalid message or key")
+        # receive data from the socket
+        encrypted_chunk = socket.recv(2048)
 
         # Add encrypted data to email
         if count == 0:
@@ -315,7 +260,6 @@ def receive_email(socket, symkey, hmac_key):
         # check if entire message has been received
         try:
             decrypted_email = cipher.decrypt(encrypted_email).decode()
-            #print(decrypted_email)
             if "END_OF_EMAIL" in decrypted_email:
                 email = decrypted_email.split("END_OF_EMAIL")[0]
                 break

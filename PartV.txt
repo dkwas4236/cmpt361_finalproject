@@ -18,11 +18,6 @@ If the symmetric key is ever decrypted by the attacker, they can then decrypt al
 A nonce is a number that will be generated through each encryption to ensure that it is a unique encryption.
 This helps to prevent replay attacks if an attacker grabs a valid piece of encrypted data.
 
-Another way we could modify our protocol to make it more secure is by using Message Authentication Code (MAC) in our
-encryption and decryption methods. This method ensure that the message has not been altered in any way. It would be best
-to use Hash-based Message Authentication Code (HMAC) as we could also use a hash function to further improve the
-security of our protocol. We decided to go with SHA-256 as our hash function, as that seemed to provide a robust security system against message manipulation.
-
 Some better ways to modify our code would be to switch our AES.MODE from using Electronic Code Book (ECB) to
 Cipher Block Chaining (CBC), which uses an identification vector to provide further security.
 Or we also could’ve used SSL methods, but these were not allowed as per the specs of the assignment.

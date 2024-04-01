@@ -10,8 +10,6 @@ from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
-from Crypto.Hash import HMAC, SHA256
-
 
 def server():
     serverPort = 13000
@@ -71,36 +69,31 @@ def server():
                                     client_public_key = RSA.import_key(file.read())
                                 # create the sym_key, encode it, and send it
                                 sym_key = generate_key()
-                                hmac_key = generate_key()
                                 symkey_encrypted = rsa_encrypt(sym_key, client_public_key)
-                                hmackey_encrypted = rsa_encrypt(hmac_key, client_public_key)
                                 # send length of encrypted sym key
                                 connectionSocket.send(len(symkey_encrypted).to_bytes(4, 'big'))
                                 connectionSocket.send(symkey_encrypted)
-                                # send length of encrypted hmac key
-                                connectionSocket.send(len(hmackey_encrypted).to_bytes(4, 'big'))
-                                connectionSocket.send(hmackey_encrypted)
                                 print("Connection Accepted and Symmetric Key Generated for client: " + username)
                                 break
 
                     if authorization == "AUTHORIZED":
                         # receive the "OK"
-                        decrypt(connectionSocket, sym_key, hmac_key)
+                        decrypt(connectionSocket, sym_key)
                         # Create menu prompts and sent to the client
                         menuMessage = ("\nSelect the operation:\n\t1) Create and send an email\n\t2) Display the inbox list\n\t3) Display the email contents\n\t4) Terminate the connection\nChoice: ")
-                        encrypt(menuMessage, connectionSocket, sym_key, hmac_key)
+                        encrypt(menuMessage, connectionSocket, sym_key)
 
                         while (1):
                             # Receive user chice from client 
-                            decodedChoice = decrypt(connectionSocket, sym_key, hmac_key)
+                            decodedChoice = decrypt(connectionSocket, sym_key)
 
                             if decodedChoice == "1":
                                 # Send destination prompt to the client 
                                 emailPrompt = "Send the email"
-                                encrypt(emailPrompt,connectionSocket,sym_key, hmac_key)
+                                encrypt(emailPrompt,connectionSocket,sym_key)
 
                                 # Get email from client 
-                                email = receive_email(connectionSocket,sym_key,hmac_key)
+                                email = receive_email(connectionSocket,sym_key)
                                 #print(email)
                                 # Track until all headers are recorded
                                 count = 0
@@ -145,9 +138,9 @@ def server():
                                 #Index      From          DateTime                      Title
                                 #1          client2       2022-07-21 19:29:35.768508    Test2 
                                 # create list header
-                                header = f"{"Index":<7} {"From":<14} {"DataTime":<28} {"Title"}"
+                                header = f'{"Index":<7} {"From":<14} {"DataTime":<28} {"Title"}'
                                 # send the header and email list to the client
-                                encrypt(header, connectionSocket, sym_key, hmac_key)
+                                encrypt(header, connectionSocket, sym_key)
                             
                                 email_list = sort_by_date(files)
 
@@ -158,12 +151,12 @@ def server():
                                     inbox = inbox + (f"{count:<7} {email[0]:<14} {email[1]:<28} {email[2]}\n")
                                     count += 1
 
-                                send_email(inbox,connectionSocket,sym_key,hmac_key)
+                                send_email(inbox,connectionSocket,sym_key)
                                 
                             elif decodedChoice == "3":
                                 # get the index from the client
                                 response = "Enter the email index you wish to view: "
-                                encrypt(response, connectionSocket, sym_key, hmac_key)
+                                encrypt(response, connectionSocket, sym_key)
                                 # based off of the clients username access the proper path to the folder where their emails are stored
                                 user_dir = os.path.join(dir, username)
                                 # get all the files in the users directory
@@ -171,15 +164,15 @@ def server():
                                 email_list = sort_by_date(files)
 
                                 # get the index from the client check if smaller then or equal to the number of files
-                                index = int(decrypt(connectionSocket, sym_key, hmac_key))
+                                index = int(decrypt(connectionSocket, sym_key))
                                 
                                 # get the email from the file and send it to the client
                                 if index > 0 and index <= len(email_list):
                                     with open(email_list[index-1][3], 'r') as email_file:
                                         email = email_file.read()
-                                        send_email(email, connectionSocket, sym_key, hmac_key)
+                                        send_email(email, connectionSocket, sym_key)
                                 else:
-                                    encrypt("Invalid index", connectionSocket, sym_key, hmac_key)
+                                    encrypt("Invalid index", connectionSocket, sym_key)
                                 
 
                             elif decodedChoice == "4":
@@ -208,18 +201,6 @@ def server():
                 sys.exit(1)
 
 '''
-Need to copy and paste rest of server program into here when it is finished
-
-key = generate_key()
-hmac_key = generate_key()
-
-symkey_encrypted = rsa_encrypt(sym_key, client_public_key)
-hmackey_encrypted = rsa_encrypt(hmac_key, client_public_key)
-
-# want to send both keys separately to avoid attacker grabbing both at same time
-connectionSocket.send(symkey_encrypted)
-connectionSocket.send(hmackey_encrypted)
-
 # simple testing functionality to demonstrate tampering
 tampered_message = decrypt(connectionSocket, sym_key, hmac_key))
 '''
@@ -246,53 +227,38 @@ def rsa_encrypt(message, public_key):
     encrypted_message = cipher.encrypt(message)
     return encrypted_message
 
-# new function uses hash function SHA256 and nonce (number used once) to enhance security
-def encrypt(message, socket, sym_key, hmac_key):
+# new function uses once (number used once) to enhance security
+def encrypt(message, socket, sym_key):
     # generate a nonce
     nonce = get_random_bytes(AES.block_size)
+    # print statement demonstrates functionality of nonce
+    print(f"Encrypt: Nonce = {nonce.hex()}")
 
     # append nonce to message
     message_with_nonce = nonce + message.encode()
 
     # encrypt the message
     cipher = AES.new(sym_key, AES.MODE_ECB)
-    cipher_bytes = cipher.encrypt(pad(message_with_nonce, AES.block_size))
+    encrypted_message = cipher.encrypt(pad(message_with_nonce, AES.block_size))
 
-    # generate HMAC
-    hmac = HMAC.new(hmac_key, digestmod=SHA256)
-    hmac.update(cipher_bytes)
-    hmac_digest = hmac.digest()
-
-    # append HMAC to encrypted message
-    encrypted_message = cipher_bytes + hmac_digest
-
-    # printing so that we can demonstrate what it looks like
+    # send encrypted message
     socket.send(encrypted_message)
 
-# new function uses hash function SHA256 and nonce (number used once) to enhance security
-def decrypt(socket, sym_key, hmac_key):
-    # receive data from the socket ( + SHA256.digest_size = size adjustment needed for the SHA)
-    received_data = socket.recv(2048 + SHA256.digest_size)
-
-    # separate encrypted data and HMAC
-    encrypted_data = received_data[:-SHA256.digest_size]
-    received_hmac = received_data[-SHA256.digest_size:]
-
-    # verify HMAC
-    hmac = HMAC.new(hmac_key, digestmod=SHA256)
-    hmac.update(encrypted_data)
-    try:
-        hmac.verify(received_hmac)
-    except ValueError:
-        raise ValueError("Tampering detected. Invalid message or key")
+# new function uses nonce (number used once) to enhance security
+def decrypt(socket, sym_key):
+    # receive encrypted data
+    encrypted_message = socket.recv(2048)
 
     # decrypt the data
     cipher = AES.new(sym_key, AES.MODE_ECB)
-    decrypted_data = cipher.decrypt(encrypted_data)
+    decrypted_data = cipher.decrypt(encrypted_message)
 
     # remove padding and nonce
+    extracted_nonce = decrypted_data[:AES.block_size]
     plaintext = unpad(decrypted_data, AES.block_size)[AES.block_size:]
 
+    # print statement demonstrates functionality of nonce
+    print(f"Decrypt: Extracted Nonce = {extracted_nonce.hex()}")
     return plaintext.decode()
 
 '''
@@ -303,28 +269,15 @@ Return: cryptographically strong random bytes
 def generate_key(key_size=32):
     return get_random_bytes(key_size)
 
-
-def receive_email(socket, symkey, hmac_key):
+def receive_email(socket, symkey):
     cipher = AES.new(symkey, AES.MODE_ECB)
     encrypted_email = b''
     count = 0
     while True:
-        # receive data from the socket ( + SHA256.digest_size = size adjustment needed for the SHA)
-        chunk = socket.recv(2048 + SHA256.digest_size)
+        # receive data from the socket
+        encrypted_chunk = socket.recv(2048)
 
-        # separate encrypted data and HMAC
-        encrypted_chunk = chunk[:-SHA256.digest_size]
-        chunk_hmac = chunk[-SHA256.digest_size:]
-
-        # verify HMAC
-        hmac = HMAC.new(hmac_key, digestmod=SHA256)
-        hmac.update(encrypted_chunk)
-        #try:
-        #    hmac.verify(chunk_hmac)
-        #except ValueError:
-        #    raise ValueError("Tampering detected. Invalid message or key")
-
-        # Add encrypted data to email & remove nounce 
+        # Add encrypted data to email
         if count == 0:
            encrypted_email += encrypted_chunk[AES.block_size:]
            count += 1
@@ -334,7 +287,6 @@ def receive_email(socket, symkey, hmac_key):
 
         # check if entire message has been received
         try:
-            #print(encrypted_email)
             decrypted_email = cipher.decrypt(encrypted_email).decode()
             if "END_OF_EMAIL" in decrypted_email:
                 email = decrypted_email.split("END_OF_EMAIL")[0]
@@ -345,7 +297,7 @@ def receive_email(socket, symkey, hmac_key):
     # in case loop exits without returning (it shouldn't in normal conditions)
     return email
 
-def send_email(email,socket,symkey, hmac_key):
+def send_email(email,socket,symkey):
     # generate a nonce
     nonce = get_random_bytes(AES.block_size)
     # append nonce and end of email marker to message
@@ -353,30 +305,20 @@ def send_email(email,socket,symkey, hmac_key):
     email = email + "END_OF_EMAIL"
     email = nonce + email.encode()
 
-    # generate HMAC
-    hmac = HMAC.new(hmac_key, digestmod=SHA256)
-    
     cipher = AES.new(symkey, AES.MODE_ECB)
-    
-    # Check to see if message needs padding, then encrpyt 
+
+    # Check to see if message needs padding, then encrpyt
     if len(email) % 16 != 0:
         padded_email = pad(email, AES.block_size)
         encrypted_email = cipher.encrypt(padded_email)
-        hmac.update(encrypted_email)
-        hmac_digest = hmac.digest()
-        encrypted_email = encrypted_email + hmac_digest
     else:
         encrypted_email = cipher.encrypt(email)
-        hmac.update(encrypted_email)
-        hmac_digest = hmac.digest()
-        encrypted_email = encrypted_email + hmac_digest
-   
+
     # send encrypted data in chunks
     chunk_size = 2048
     for i in range(0, len(encrypted_email), chunk_size):
         chunk = encrypted_email[i:i + chunk_size]
         socket.send(chunk)
-
 
 '''
 Purpose: store email in the inbox of the receivers
@@ -395,7 +337,6 @@ def store_emails(users,title,email,sender):
         except:
             # If invalid user print error message
             print(f"Email failed to send to {user}. {user} is not a valid user.")
-
 
 '''
 Purpose: Sort  the files in the user directory by date and time
