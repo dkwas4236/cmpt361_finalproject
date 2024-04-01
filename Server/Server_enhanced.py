@@ -140,35 +140,26 @@ def server():
                                 user_dir = os.path.join(dir, username)
                                 # get all the files in the users directory
                                 files = glob.glob(user_dir + '/*.txt')
-                                # create a list to store the email subprotocol for the client example of subprotocol below
-                                #Index From          DateTime             Title
-                                #1     client2 2022-07-21 19:29:35.768508 Test2 
+                                
+                                # create a inbox in example of subprotocol below
+                                #Index      From          DateTime                      Title
+                                #1          client2       2022-07-21 19:29:35.768508    Test2 
                                 # create list header
-                                header = "Index   From          DateTime                      Title"
+                                header = f"{"Index":<7} {"From":<14} {"DataTime":<28} {"Title"}"
                                 # send the header and email list to the client
                                 encrypt(header, connectionSocket, sym_key, hmac_key)
                             
-                                email_list = []
-                                # loop through all the files in the users directory and get the email information index, sender, date, and title
-                                count = 0
-                                for file in files:
+                                email_list = sort_by_date(files)
+
+                                # convert list of emails into a single string
+                                count = 1
+                                inbox = ""
+                                for email in email_list:
+                                    inbox = inbox + (f"{count:<7} {email[0]:<14} {email[1]:<28} {email[2]}\n")
                                     count += 1
-                                    with open(file, 'r') as email_file:
-                                        email = email_file.readlines()
-                                        # get the sender
-                                        sender = email[0].split(": ")[1].strip()
-                                        # get the date and time
-                                        date_time = email[2].split(": ")[1].strip()
-                                        # get the title
-                                        title = email[3].split(": ")[1].strip()
-                                        # append the email information to the list
-                                        email_list.append(f"{count:<7} {sender:<14} {date_time:<28} {title}")
-                                # send the email list to the client
-                                #for email in email_list:
-                                #   encrypt(email, connectionSocket, sym_key)
-                                send_email("\n".join(email_list),connectionSocket,sym_key,hmac_key)
-                                # send the end of emails tag
-                                #encrypt("END_OF_EMAILS", connectionSocket, sym_key, hmac_key)
+
+                                send_email(inbox,connectionSocket,sym_key,hmac_key)
+                                
                             elif decodedChoice == "3":
                                 # get the index from the client
                                 response = "Enter the email index you wish to view: "
@@ -177,13 +168,14 @@ def server():
                                 user_dir = os.path.join(dir, username)
                                 # get all the files in the users directory
                                 files = glob.glob(user_dir + '/*.txt')
+                                email_list = sort_by_date(files)
 
                                 # get the index from the client check if smaller then or equal to the number of files
                                 index = int(decrypt(connectionSocket, sym_key, hmac_key))
                                 
                                 # get the email from the file and send it to the client
-                                if index <= len(files):
-                                    with open(files[index-1], 'r') as email_file:
+                                if index > 0 and index <= len(email_list):
+                                    with open(email_list[index-1][3], 'r') as email_file:
                                         email = email_file.read()
                                         send_email(email, connectionSocket, sym_key, hmac_key)
                                 else:
@@ -232,13 +224,23 @@ connectionSocket.send(hmackey_encrypted)
 tampered_message = decrypt(connectionSocket, sym_key, hmac_key))
 '''
 
-# RSA decrypt method for INITIAL handshake between client and server
+'''
+Purpose: RSA decrypt method for INITIAL handshake between client and server
+Parameters: encrypted_message: str value of the message to decrypt
+            private_key: key to decrypt message, private and unique for each client
+Return: decrypted_messgae: the decrypted message
+'''
 def rsa_decrypt(encrypted_message, private_key):
     cipher = PKCS1_OAEP.new(private_key)
     decrypted_message = cipher.decrypt(encrypted_message)
     return decrypted_message
 
-# RSA encrypt method for INITIAL handshake between client and server
+'''
+Purpose: RSA encrypt method for INITIAL handshake between client and server
+Parameters: message: str value of the message to encrypt using the public_key
+            public_key: key to encrypt message using the server's key
+Return: encrypted_messgae: the encrypted message
+'''
 def rsa_encrypt(message, public_key):
     cipher = PKCS1_OAEP.new(public_key)
     encrypted_message = cipher.encrypt(message)
@@ -293,8 +295,14 @@ def decrypt(socket, sym_key, hmac_key):
 
     return plaintext.decode()
 
+'''
+Purpose: generates a 256 AES key ( 256 = 32 bytes) that will be exchanged with client
+Parameters: key_size: size of the key with default value set to 32 if none is given
+Return: cryptographically strong random bytes
+'''   
 def generate_key(key_size=32):
     return get_random_bytes(key_size)
+
 
 def receive_email(socket, symkey, hmac_key):
     cipher = AES.new(symkey, AES.MODE_ECB)
@@ -369,12 +377,53 @@ def send_email(email,socket,symkey, hmac_key):
         chunk = encrypted_email[i:i + chunk_size]
         socket.send(chunk)
 
+
+'''
+Purpose: store email in the inbox of the receivers
+Parameters: users: the usernames of the user(s) receiving the email
+            title: email title
+            email: contents and information of the email
+            sender: user who sent the email
+'''
 def store_emails(users,title,email,sender):
     for user in users:
         dir = os.path.dirname(os.path.abspath(__file__))
         filename = f'{user}/{sender}_{title.replace(" ","_")}.txt'
-        with open(os.path.join(dir,filename), 'w') as email_file:
-            email_file.write(email)
+        try:
+            with open(os.path.join(dir,filename), 'w') as email_file:
+                email_file.write(email)
+        except:
+            # If invalid user print error message
+            print(f"Email failed to send to {user}. {user} is not a valid user.")
+
+
+'''
+Purpose: Sort  the files in the user directory by date and time
+Parameters: files: .txt files in the user's directory
+Return: email_list: list of emails
+'''  
+def sort_by_date(files):
+    email_list = []
+    # loop through all the files in the users directory and get the email information index, sender, date, and title
+    for file in files:
+        with open(file, 'r') as email_file:
+            email = email_file.readlines()
+            # get the sender
+            sender = email[0].split(": ")[1].strip()
+            # get the date and time
+            date_time = email[2].split(": ")[1].strip()
+            # get the title
+            title = email[3].split(": ")[1].strip()
+            # append the email information to the list
+            email_list.append([sender, date_time, title, file])
+
+    # sort email list by the date and time (index 2 of each email in list)
+    email_list.sort(key=lambda email: email[1])        
+
+    # convert the list of emails into a single string
+    
+    return email_list
+
 
  # call the server function below
 if __name__ == "__main__":

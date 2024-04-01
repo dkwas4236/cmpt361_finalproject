@@ -309,9 +309,12 @@ def store_emails(users,title,email,sender):
     for user in users:
         dir = os.path.dirname(os.path.abspath(__file__))
         filename = f'{user}/{sender}_{title.replace(" ","_")}.txt'
-        with open(os.path.join(dir,filename), 'w') as email_file:
-            email_file.write(email)
-
+        try:
+            with open(os.path.join(dir,filename), 'w') as email_file:
+                email_file.write(email)
+        except:
+            # If invalid user print error message
+            print(f"Email failed to send to {user}. {user} is not a valid user.")
 '''
 Purpose: generates a 256 AES key ( 256 = 32 bytes) that will be exchanged with client
 Parameters: key_size: size of the key with default value set to 32 if none is given
@@ -332,7 +335,7 @@ def sort_by_date(files):
         with open(file, 'r') as email_file:
             email = email_file.readlines()
             # get the sender
-            sender = email[1].split(": ")[1].strip()
+            sender = email[0].split(": ")[1].strip()
             # get the date and time
             date_time = email[2].split(": ")[1].strip()
             # get the title
